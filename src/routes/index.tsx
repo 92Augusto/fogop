@@ -4,7 +4,7 @@ import { Header } from "@/components/Header";
 import { SearchPanel, type Filters } from "@/components/SearchPanel";
 import { StatsPanel } from "@/components/StatsPanel";
 import { ResultsTable } from "@/components/ResultsTable";
-import { obrasData } from "@/data/obras";
+import { obrasData } from "@/data/obras-data";
 
 export const Route = createFileRoute("/")({
   head: () => ({
