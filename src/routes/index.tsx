@@ -1,9 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useMemo } from "react";
+import { useAuth } from "@/lib/auth";
+import { LoginPage } from "@/components/LoginPage";
 import { Header } from "@/components/Header";
 import { SearchPanel, type Filters } from "@/components/SearchPanel";
 import { StatsPanel } from "@/components/StatsPanel";
 import { ResultsTable } from "@/components/ResultsTable";
+import { AdminPanel } from "@/components/AdminPanel";
 import { obrasData } from "@/data/obras-data";
 
 export const Route = createFileRoute("/")({
@@ -28,8 +31,10 @@ const emptyFilters: Filters = {
 };
 
 function HomePage() {
+  const { user } = useAuth();
   const [filters, setFilters] = useState<Filters>(emptyFilters);
   const [appliedFilters, setAppliedFilters] = useState<Filters>(emptyFilters);
+  const [showAdmin, setShowAdmin] = useState(false);
 
   const results = useMemo(() => {
     const f = appliedFilters;
@@ -44,9 +49,11 @@ function HomePage() {
     });
   }, [appliedFilters]);
 
+  if (!user) return <LoginPage />;
+
   return (
     <div className="min-h-screen bg-background">
-      <Header />
+      <Header onOpenAdmin={() => setShowAdmin(true)} />
       <SearchPanel
         filters={filters}
         onChange={setFilters}
@@ -58,6 +65,9 @@ function HomePage() {
       />
       <StatsPanel results={results} />
       <ResultsTable results={results} />
+      {showAdmin && user.role === "admin" && (
+        <AdminPanel onClose={() => setShowAdmin(false)} />
+      )}
     </div>
   );
 }

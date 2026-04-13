@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { Obra, EstadoObra } from "@/data/obras";
+import { exportObrasToExcel } from "@/lib/excel-export";
 
 const PAGE_SIZE = 20;
 
@@ -22,13 +23,21 @@ export function ResultsTable({ results }: Props) {
   const currentPage = Math.min(page, totalPages - 1);
   const slice = results.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE);
 
-  // Reset to page 0 when results change
   if (page >= totalPages && page > 0) setPage(0);
 
   return (
     <section className="mx-auto max-w-7xl px-4 pb-8">
-      <div className="mb-3 text-sm text-muted-foreground">
-        {results.length} resultado{results.length !== 1 ? "s" : ""} encontrado{results.length !== 1 ? "s" : ""}
+      <div className="mb-3 flex items-center justify-between">
+        <span className="text-sm text-muted-foreground">
+          {results.length} resultado{results.length !== 1 ? "s" : ""} encontrado{results.length !== 1 ? "s" : ""}
+        </span>
+        <button
+          onClick={() => exportObrasToExcel(results)}
+          disabled={results.length === 0}
+          className="rounded-md bg-primary px-4 py-1.5 text-xs font-medium text-primary-foreground hover:bg-accent disabled:opacity-40"
+        >
+          Exportar Excel
+        </button>
       </div>
 
       {results.length === 0 ? (
@@ -74,7 +83,6 @@ export function ResultsTable({ results }: Props) {
             </table>
           </div>
 
-          {/* Pagination */}
           {totalPages > 1 && (
             <div className="mt-4 flex items-center justify-center gap-1">
               <button
