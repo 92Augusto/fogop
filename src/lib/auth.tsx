@@ -1,4 +1,13 @@
-import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
+import {
+  createContext, useContext, useState,
+  useCallback, useEffect, type ReactNode
+} from "react";
+import {
+  collection, doc,
+  getDocs, setDoc, deleteDoc,
+  updateDoc, addDoc
+} from "firebase/firestore";
+import { db } from "./firebase";
 
 export type UserRole = "admin" | "user";
 
@@ -7,129 +16,116 @@ export interface AppUser {
   role: UserRole;
 }
 
-interface AccessLogEntry {
-  username: string;
-  role: UserRole;
-  loginAt: string; // ISO string
-}
-
-interface AuthContextValue {
-  user: AppUser | null;
-  login: (username: string, password: string) => boolean;
-  logout: () => void;
-  accessLog: AccessLogEntry[];
-  // Admin user management
-  users: StoredUser[];
-  addUser: (u: StoredUser) => void;
-  removeUser: (username: string) => void;
-  updateUser: (username: string, updates: Partial<StoredUser>) => void;
-}
-
 export interface StoredUser {
+  id?: string;
   username: string;
   password: string;
   role: UserRole;
 }
 
-const DEFAULT_USERS: StoredUser[] = [
-  { username: "Augusto", password: "Augusto92", role: "admin" },
-];
-
-function loadUsers(): StoredUser[] {
-  try {
-    const raw = localStorage.getItem("fogop_users");
-    if (raw) return JSON.parse(raw);
-  } catch {}
-  return [...DEFAULT_USERS];
+interface AccessLogEntry {
+  username: string;
+  role: UserRole;
+  loginAt: string;
 }
 
-function saveUsers(users: StoredUser[]) {
-  localStorage.setItem("fogop_users", JSON.stringify(users));
-}
-
-function loadAccessLog(): AccessLogEntry[] {
-  try {
-    const raw = localStorage.getItem("fogop_access_log");
-    if (raw) return JSON.parse(raw);
-  } catch {}
-  return [];
-}
-
-function saveAccessLog(log: AccessLogEntry[]) {
-  localStorage.setItem("fogop_access_log", JSON.stringify(log));
-}
-
-function loadSession(): AppUser | null {
-  try {
-    const raw = sessionStorage.getItem("fogop_session");
-    if (raw) return JSON.parse(raw);
-  } catch {}
-  return null;
+interface AuthContextValue {
+  user: AppUser | null;
+  login: (username: string, password: string) => Promise<boolean>;
+  logout: () => void;
+  accessLog: AccessLogEntry[];
+  users: StoredUser[];
+  addUser: (u: Omit<StoredUser, "id">) => Promise<void>;
+  removeUser: (id: string) => Promise<void>;
+  updateUser: (id: string, updates: Partial<StoredUser>) => Promise<void>;
+  loading: boolean;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<AppUser | null>(() => loadSession());
-  const [users, setUsers] = useState<StoredUser[]>(() => loadUsers());
-  const [accessLog, setAccessLog] = useState<AccessLogEntry[]>(() => loadAccessLog());
+  const [user, setUser] = useState<AppUser | null>(() => {
+    try {
+      const raw = sessionStorage.getItem("fogop_session");
+      return raw ? JSON.parse(raw) : null;
+    } catch { return null; }
+  });
 
-  const login = useCallback(
-    (username: string, password: string): boolean => {
-      const found = users.find(
-        (u) => u.username.toLowerCase() === username.toLowerCase() && u.password === password
-      );
-      if (!found) return false;
-      const appUser: AppUser = { username: found.username, role: found.role };
-      setUser(appUser);
-      sessionStorage.setItem("fogop_session", JSON.stringify(appUser));
-      const entry: AccessLogEntry = {
+  const [users, setUsers] = useState<StoredUser[]>([]);
+  const [accessLog, setAccessLog] = useState<AccessLogEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function cargarUsuarios() {
+      try {
+        const snap = await getDocs(collection(db, "usuarios"));
+        const lista: StoredUser[] = snap.docs.map(d => ({
+          id: d.id,
+          ...(d.data() as Omit<StoredUser, "id">)
+        }));
+        if (lista.length === 0) {
+          const ref = await addDoc(collection(db, "usuarios"), {
+            username: "Augusto",
+            password: "Augusto92",
+            role: "admin"
+          });
+          lista.push({ id: ref.id, username: "Augusto", password: "Augusto92", role: "admin" });
+        }
+        setUsers(lista);
+      } catch (e) {
+        console.error("Error cargando usuarios:", e);
+      } finally {
+        setLoading(false);
+      }
+    }
+    cargarUsuarios();
+  }, []);
+
+  const login = useCallback(async (username: string, password: string): Promise<boolean> => {
+    const found = users.find(
+      u => u.username.toLowerCase() === username.toLowerCase() && u.password === password
+    );
+    if (!found) return false;
+
+    const appUser: AppUser = { username: found.username, role: found.role };
+    setUser(appUser);
+    sessionStorage.setItem("fogop_session", JSON.stringify(appUser));
+
+    try {
+      await addDoc(collection(db, "accessLog"), {
         username: found.username,
         role: found.role,
-        loginAt: new Date().toISOString(),
-      };
-      const newLog = [entry, ...accessLog];
-      setAccessLog(newLog);
-      saveAccessLog(newLog);
-      return true;
-    },
-    [users, accessLog]
-  );
+        loginAt: new Date().toISOString()
+      });
+    } catch (e) {
+      console.error("Error guardando log:", e);
+    }
+
+    return true;
+  }, [users]);
 
   const logout = useCallback(() => {
     setUser(null);
     sessionStorage.removeItem("fogop_session");
   }, []);
 
-  const addUser = useCallback(
-    (u: StoredUser) => {
-      const next = [...users, u];
-      setUsers(next);
-      saveUsers(next);
-    },
-    [users]
-  );
+  const addUser = useCallback(async (u: Omit<StoredUser, "id">) => {
+    const ref = await addDoc(collection(db, "usuarios"), u);
+    setUsers(prev => [...prev, { id: ref.id, ...u }]);
+  }, []);
 
-  const removeUser = useCallback(
-    (username: string) => {
-      const next = users.filter((u) => u.username !== username);
-      setUsers(next);
-      saveUsers(next);
-    },
-    [users]
-  );
+  const removeUser = useCallback(async (id: string) => {
+    await deleteDoc(doc(db, "usuarios", id));
+    setUsers(prev => prev.filter(u => u.id !== id));
+  }, []);
 
-  const updateUser = useCallback(
-    (username: string, updates: Partial<StoredUser>) => {
-      const next = users.map((u) => (u.username === username ? { ...u, ...updates } : u));
-      setUsers(next);
-      saveUsers(next);
-    },
-    [users]
-  );
+  const updateUser = useCallback(async (id: string, updates: Partial<StoredUser>) => {
+    await updateDoc(doc(db, "usuarios", id), updates);
+    setUsers(prev => prev.map(u => u.id === id ? { ...u, ...updates } : u));
+  }, []);
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, accessLog, users, addUser, removeUser, updateUser }}>
+    <AuthContext.Provider value={{ user, login, logout, accessLog, users, addUser, removeUser, updateUser, loading }}>
       {children}
     </AuthContext.Provider>
   );
