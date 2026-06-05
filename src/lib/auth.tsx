@@ -3,11 +3,21 @@ import {
   useCallback, useEffect, type ReactNode
 } from "react";
 import {
-  collection, doc,
-  getDocs, setDoc, deleteDoc,
-  updateDoc, addDoc
+  collection, addDoc, getDocs, setDoc, deleteDoc,
+  updateDoc, doc, getDoc
 } from "firebase/firestore";
-import { db } from "./firebase";
+import {
+  signInWithEmailAndPassword,
+  signOut,
+  createUserWithEmailAndPassword,
+  onAuthStateChanged,
+} from "firebase/auth";
+import { db, auth } from "./firebase";
+
+// ─── Flag de migración a nivel módulo ────────────────────────────────────────
+// Evita que onAuthStateChanged desloguee al usuario mientras la migración
+// está creando su documento en Firestore.
+let _migrationActive = false;
 
 export type UserRole = "admin" | "user";
 
@@ -19,8 +29,9 @@ export interface AppUser {
 export interface StoredUser {
   id?: string;
   username: string;
-  password: string;
   role: UserRole;
+  email?: string;
+  password?: string;
 }
 
 interface AccessLogEntry {
@@ -35,7 +46,7 @@ interface AuthContextValue {
   logout: () => void;
   accessLog: AccessLogEntry[];
   users: StoredUser[];
-  addUser: (u: Omit<StoredUser, "id">) => Promise<void>;
+  addUser: (u: Omit<StoredUser, "id" | "email"> & { password?: string }) => Promise<void>;
   removeUser: (id: string) => Promise<void>;
   updateUser: (id: string, updates: Partial<StoredUser>) => Promise<void>;
   loading: boolean;
@@ -55,73 +66,261 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [accessLog, setAccessLog] = useState<AccessLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // ─── Listener de sesión de Firebase Auth ───────────────────────────────────
   useEffect(() => {
-    async function cargarUsuarios() {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        // Si hay una migración en curso, el documento en Firestore todavía no
+        // existe. No hacemos nada: login() se encargará de setUser() una vez
+        // que termine de guardar el perfil.
+        if (_migrationActive) {
+          setLoading(false);
+          return;
+        }
+
+        try {
+          const userDoc = await getDoc(doc(db, "usuarios", firebaseUser.uid));
+          if (userDoc.exists()) {
+            const data = userDoc.data();
+            const appUser: AppUser = { username: data.username, role: data.role };
+            setUser(appUser);
+            sessionStorage.setItem("fogop_session", JSON.stringify(appUser));
+          } else {
+            // No encontramos perfil: cerramos sesión de Auth por seguridad.
+            await signOut(auth);
+            setUser(null);
+            sessionStorage.removeItem("fogop_session");
+          }
+        } catch (e) {
+          console.error("Error al recuperar sesión activa:", e);
+        }
+      } else {
+        setUser(null);
+        sessionStorage.removeItem("fogop_session");
+      }
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // ─── Cargar datos de administración ────────────────────────────────────────
+  useEffect(() => {
+    if (!user || user.role !== "admin") {
+      setUsers([]);
+      setAccessLog([]);
+      return;
+    }
+
+    async function cargarDatosAdmin() {
       try {
-        const snap = await getDocs(collection(db, "usuarios"));
-        const lista: StoredUser[] = snap.docs.map(d => ({
+        const snapUsuarios = await getDocs(collection(db, "usuarios"));
+        const lista: StoredUser[] = snapUsuarios.docs.map(d => ({
           id: d.id,
           ...(d.data() as Omit<StoredUser, "id">)
         }));
-        if (lista.length === 0) {
-          const ref = await addDoc(collection(db, "usuarios"), {
-            username: "Augusto",
-            password: "Augusto92",
-            role: "admin"
-          });
-          lista.push({ id: ref.id, username: "Augusto", password: "Augusto92", role: "admin" });
-        }
         setUsers(lista);
+
+        const snapLog = await getDocs(collection(db, "accessLog"));
+        const log: AccessLogEntry[] = snapLog.docs
+          .map(d => d.data() as AccessLogEntry)
+          .sort((a, b) => new Date(b.loginAt).getTime() - new Date(a.loginAt).getTime());
+        setAccessLog(log);
       } catch (e) {
-        console.error("Error cargando usuarios:", e);
-      } finally {
-        setLoading(false);
+        console.error("Error cargando paneles de administración:", e);
       }
     }
-    cargarUsuarios();
-  }, []);
 
+    cargarDatosAdmin();
+  }, [user]);
+
+  // ─── LOGIN con migración automática ────────────────────────────────────────
   const login = useCallback(async (username: string, password: string): Promise<boolean> => {
-    const found = users.find(
-      u => u.username.toLowerCase() === username.toLowerCase() && u.password === password
-    );
-    if (!found) return false;
+    const cleanUsername = username.trim();
+    const email = `${cleanUsername.toLowerCase()}@fogop.local`;
 
-    const appUser: AppUser = { username: found.username, role: found.role };
-    setUser(appUser);
-    sessionStorage.setItem("fogop_session", JSON.stringify(appUser));
+    // authUID: se llena si Firebase Auth ya tiene una cuenta para este email/password
+    let authUID: string | null = null;
 
+    // ── PASO 1: Intentar login directo con Firebase Auth (usuario ya migrado) ──
     try {
-      await addDoc(collection(db, "accessLog"), {
-        username: found.username,
-        role: found.role,
-        loginAt: new Date().toISOString()
-      });
-    } catch (e) {
-      console.error("Error guardando log:", e);
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      authUID = userCredential.user.uid;
+
+      const userDoc = await getDoc(doc(db, "usuarios", authUID));
+      if (userDoc.exists()) {
+        // ✅ Caso ideal: Firebase Auth + Firestore doc vinculados correctamente
+        const data = userDoc.data();
+        const appUser: AppUser = { username: data.username, role: data.role };
+        setUser(appUser);
+        sessionStorage.setItem("fogop_session", JSON.stringify(appUser));
+        await addDoc(collection(db, "accessLog"), {
+          username: data.username,
+          role: data.role,
+          loginAt: new Date().toISOString()
+        });
+        return true;
+      }
+      // Firebase Auth OK pero no hay doc de Firestore con ese UID.
+      // Puede ser un doc legacy con ID distinto → caemos al paso 2.
+    } catch {
+      // No tiene cuenta en Firebase Auth → seguimos con migración
     }
 
-    return true;
-  }, [users]);
+    // ── PASO 2: Buscar doc legacy en Firestore (tiene campo password) ──────────
+    try {
+      const snapUsuarios = await getDocs(collection(db, "usuarios"));
+      const docAntiguo = snapUsuarios.docs.find(d => {
+        const data = d.data();
+        return (
+          data.username &&
+          data.username.toLowerCase() === cleanUsername.toLowerCase() &&
+          data.password === password
+        );
+      });
 
-  const logout = useCallback(() => {
+      if (!docAntiguo) {
+        // No hay doc legacy con password. Si estaba autenticado en Auth pero sin
+        // doc Firestore, es una cuenta huérfana: cerramos sesión.
+        if (authUID) await signOut(auth);
+        return false;
+      }
+
+      const oldData = docAntiguo.data();
+
+      // ── PASO 3: Conseguir el UID de Firebase Auth ──────────────────────────
+      // Activamos el flag ANTES de cualquier operación de Auth para que
+      // onAuthStateChanged no desloguee al usuario durante la migración.
+      _migrationActive = true;
+
+      let uid: string;
+
+      if (authUID) {
+        // ✅ Ya tenemos el UID de Firebase Auth (paso 1 firmó con éxito).
+        // No necesitamos crear otra cuenta → usamos ese UID directamente.
+        uid = authUID;
+      } else {
+        // Intentamos crear la cuenta en Firebase Auth
+        try {
+          const credential = await createUserWithEmailAndPassword(auth, email, password);
+          uid = credential.user.uid;
+        } catch (authErr: any) {
+          if (authErr?.code === "auth/email-already-in-use") {
+            // La cuenta Auth ya existe pero no firmamos en el paso 1 (raro).
+            // Intentamos firmar ahora.
+            try {
+              const cred = await signInWithEmailAndPassword(auth, email, password);
+              uid = cred.user.uid;
+            } catch {
+              _migrationActive = false;
+              return false;
+            }
+          } else if (authErr?.code === "auth/weak-password") {
+            // Contraseña < 6 caracteres: Firebase Auth la rechaza.
+            // Logueamos directamente desde Firestore sin migrar.
+            _migrationActive = false;
+            const appUser: AppUser = { username: oldData.username, role: oldData.role };
+            setUser(appUser);
+            sessionStorage.setItem("fogop_session", JSON.stringify(appUser));
+            await addDoc(collection(db, "accessLog"), {
+              username: oldData.username,
+              role: oldData.role,
+              loginAt: new Date().toISOString()
+            });
+            return true;
+          } else {
+            _migrationActive = false;
+            throw authErr;
+          }
+        }
+      }
+
+      // ── PASO 4: Guardar (o reemplazar) el perfil en Firestore con el UID Auth ─
+      await setDoc(doc(db, "usuarios", uid), {
+        username: oldData.username,
+        role: oldData.role,
+        email: email,
+        password: oldData.password ?? password, // conservar para visibilidad del admin
+      });
+
+      // ── PASO 5: Eliminar el doc legacy con ID aleatorio ─────────────────────
+      if (docAntiguo.id !== uid) {
+        await deleteDoc(doc(db, "usuarios", docAntiguo.id));
+      }
+
+      _migrationActive = false;
+
+      // ── PASO 6: Establecer la sesión ────────────────────────────────────────
+      const appUser: AppUser = { username: oldData.username, role: oldData.role };
+      setUser(appUser);
+      sessionStorage.setItem("fogop_session", JSON.stringify(appUser));
+
+      await addDoc(collection(db, "accessLog"), {
+        username: oldData.username,
+        role: oldData.role,
+        loginAt: new Date().toISOString()
+      });
+
+      return true;
+
+    } catch (err) {
+      _migrationActive = false;
+      console.error("Error durante la migración de usuario:", err);
+      return false;
+    }
+  }, []);
+
+  // ─── LOGOUT ────────────────────────────────────────────────────────────────
+  const logout = useCallback(async () => {
+    try { await signOut(auth); } catch (e) {
+      console.error("Error al desloguear:", e);
+    }
     setUser(null);
     sessionStorage.removeItem("fogop_session");
   }, []);
 
-  const addUser = useCallback(async (u: Omit<StoredUser, "id">) => {
-    const ref = await addDoc(collection(db, "usuarios"), u);
-    setUsers(prev => [...prev, { id: ref.id, ...u }]);
+  // ─── AGREGAR USUARIO ───────────────────────────────────────────────────────
+  // Guarda el usuario directamente en Firestore con addDoc.
+  // La próxima vez que inicie sesión, la migración automática crea su cuenta
+  // en Firebase Auth de forma transparente.
+  const addUser = useCallback(async (u: Omit<StoredUser, "id" | "email"> & { password?: string }) => {
+    if (!u.password) throw new Error("La contraseña es obligatoria.");
+    try {
+      const ref = await addDoc(collection(db, "usuarios"), {
+        username: u.username.trim(),
+        role: u.role,
+        password: u.password,
+      });
+      setUsers(prev => [
+        ...prev,
+        { id: ref.id, username: u.username.trim(), role: u.role, password: u.password },
+      ]);
+    } catch (error) {
+      console.error("Error al registrar nuevo usuario:", error);
+      throw error;
+    }
   }, []);
 
+  // ─── ELIMINAR USUARIO ──────────────────────────────────────────────────────
   const removeUser = useCallback(async (id: string) => {
-    await deleteDoc(doc(db, "usuarios", id));
-    setUsers(prev => prev.filter(u => u.id !== id));
+    try {
+      await deleteDoc(doc(db, "usuarios", id));
+      setUsers(prev => prev.filter(u => u.id !== id));
+    } catch (error) {
+      console.error("Error al eliminar usuario:", error);
+      throw error;
+    }
   }, []);
 
+  // ─── ACTUALIZAR USUARIO ────────────────────────────────────────────────────
   const updateUser = useCallback(async (id: string, updates: Partial<StoredUser>) => {
-    await updateDoc(doc(db, "usuarios", id), updates);
-    setUsers(prev => prev.map(u => u.id === id ? { ...u, ...updates } : u));
+    try {
+      await updateDoc(doc(db, "usuarios", id), { ...updates });
+      setUsers(prev => prev.map(u => u.id === id ? { ...u, ...updates } : u));
+    } catch (error) {
+      console.error("Error al actualizar usuario:", error);
+      throw error;
+    }
   }, []);
 
   return (

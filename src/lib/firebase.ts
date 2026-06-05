@@ -1,7 +1,8 @@
 import { initializeApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
+import { getFirestore, enableIndexedDbPersistence } from "firebase/firestore";
+import { getAuth } from "firebase/auth";
 
-const firebaseConfig = {
+export const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
@@ -12,3 +13,15 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
+export const auth = getAuth(app);
+
+// Solo activar persistencia offline en el browser (no en el servidor/Worker)
+if (typeof window !== "undefined") {
+  enableIndexedDbPersistence(db).catch((err) => {
+    if (err.code === "failed-precondition") {
+      console.warn("Offline: múltiples pestañas abiertas, persistencia desactivada.");
+    } else if (err.code === "unimplemented") {
+      console.warn("Offline: este browser no soporta persistencia offline.");
+    }
+  });
+}

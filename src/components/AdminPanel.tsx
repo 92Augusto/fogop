@@ -48,8 +48,12 @@ function UsersTab() {
   const [newPassword, setNewPassword] = useState("");
   const [newRole, setNewRole] = useState<UserRole>("user");
   const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editPassword, setEditPassword] = useState("");
+  const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({});
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     setError("");
     if (!newUsername.trim() || !newPassword.trim()) {
       setError("Complete todos los campos");
@@ -59,10 +63,41 @@ function UsersTab() {
       setError("El usuario ya existe");
       return;
     }
-    addUser({ username: newUsername.trim(), password: newPassword, role: newRole });
-    setNewUsername("");
-    setNewPassword("");
-    setNewRole("user");
+    setSaving(true);
+    try {
+      await addUser({ username: newUsername.trim(), password: newPassword, role: newRole });
+      setNewUsername("");
+      setNewPassword("");
+      setNewRole("user");
+    } catch (err: any) {
+      // Traducir errores comunes de Firebase a mensajes amigables
+      const code = err?.code ?? "";
+      if (code === "auth/email-already-in-use") {
+        setError("Ese nombre de usuario ya está registrado en el sistema.");
+      } else if (code === "auth/weak-password") {
+        setError("La contraseña debe tener al menos 6 caracteres.");
+      } else {
+        setError("Error al crear el usuario. Intentá de nuevo.");
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleEditPassword = (u: StoredUser) => {
+    setEditingId(u.id!);
+    setEditPassword(u.password ?? "");
+  };
+
+  const handleSavePassword = (id: string) => {
+    if (!editPassword.trim()) return;
+    updateUser(id, { password: editPassword.trim() });
+    setEditingId(null);
+    setEditPassword("");
+  };
+
+  const toggleShowPassword = (id: string) => {
+    setShowPasswords(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
   return (
@@ -72,19 +107,63 @@ function UsersTab() {
         <thead>
           <tr className="border-b">
             <th className="px-2 py-1 font-medium text-foreground">Usuario</th>
+            <th className="px-2 py-1 font-medium text-foreground">Contraseña</th>
             <th className="px-2 py-1 font-medium text-foreground">Rol</th>
             <th className="px-2 py-1 font-medium text-foreground">Acciones</th>
           </tr>
         </thead>
         <tbody>
           {users.map((u) => (
-            <tr key={u.username} className="border-b">
+            <tr key={u.id} className="border-b">
               <td className="px-2 py-1.5 text-foreground">{u.username}</td>
-              <td className="px-2 py-1.5 text-foreground capitalize">{u.role === "admin" ? "Administrador" : "Usuario"}</td>
+              <td className="px-2 py-1.5 text-foreground">
+                {editingId === u.id ? (
+                  <div className="flex items-center gap-1">
+                    <input
+                      value={editPassword}
+                      onChange={(e) => setEditPassword(e.target.value)}
+                      className="rounded-md border bg-background px-2 py-1 text-sm text-foreground w-32"
+                    />
+                    <button
+                      onClick={() => handleSavePassword(u.id!)}
+                      className="text-xs text-primary hover:underline"
+                    >
+                      Guardar
+                    </button>
+                    <button
+                      onClick={() => setEditingId(null)}
+                      className="text-xs text-muted-foreground hover:underline"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1">
+                    <span className="font-mono">
+                      {showPasswords[u.id!] ? u.password : "••••••••"}
+                    </span>
+                    <button
+                      onClick={() => toggleShowPassword(u.id!)}
+                      className="text-xs text-muted-foreground hover:underline ml-1"
+                    >
+                      {showPasswords[u.id!] ? "Ocultar" : "Ver"}
+                    </button>
+                    <button
+                      onClick={() => handleEditPassword(u)}
+                      className="text-xs text-primary hover:underline ml-1"
+                    >
+                      Editar
+                    </button>
+                  </div>
+                )}
+              </td>
+              <td className="px-2 py-1.5 text-foreground capitalize">
+                {u.role === "admin" ? "Administrador" : "Usuario"}
+              </td>
               <td className="px-2 py-1.5">
                 {u.username !== currentUser?.username ? (
                   <button
-                    onClick={() => removeUser(u.username)}
+                    onClick={() => removeUser(u.id!)}
                     className="text-xs text-destructive hover:underline"
                   >
                     Eliminar
@@ -110,7 +189,7 @@ function UsersTab() {
         <div>
           <label className="mb-1 block text-xs text-muted-foreground">Contraseña</label>
           <input
-            type="password"
+            type="text"
             value={newPassword}
             onChange={(e) => setNewPassword(e.target.value)}
             className="rounded-md border bg-background px-2 py-1.5 text-sm text-foreground"
@@ -129,9 +208,10 @@ function UsersTab() {
         </div>
         <button
           onClick={handleAdd}
-          className="rounded-md bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground hover:bg-accent"
+          disabled={saving}
+          className="rounded-md bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground hover:bg-accent disabled:opacity-50"
         >
-          Agregar
+          {saving ? "Creando..." : "Agregar"}
         </button>
       </div>
       {error && <p className="mt-2 text-sm text-destructive">{error}</p>}
