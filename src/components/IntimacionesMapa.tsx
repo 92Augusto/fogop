@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, Component, ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, Component, ReactNode, memo } from "react";
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -83,6 +83,31 @@ class MapErrorBoundary extends Component<{children: ReactNode}, {hasError: boole
 }
 
 type Punto = Intimacion & { lat: number; lng: number; aproximado: boolean };
+
+const PuntoMarker = memo(({ item, colorPin, vencido, seleccionado, modoEdicion, isUserAdmin, onGuardar, onToggleSeleccion, markerRef, guardando, guardadoOk }: any) => {
+  const handlers = useMemo(() => ({
+    click: () => { if (modoEdicion) onToggleSeleccion(item.id ?? item.nroIntimacion, seleccionado); },
+    dragend: async (e: L.LeafletEvent) => {
+      if (!modoEdicion || !isUserAdmin || !item.id) return;
+      const { lat, lng } = (e.target as L.Marker).getLatLng();
+      await onGuardar(item.id, lat, lng);
+    }
+  }), [modoEdicion, isUserAdmin, item.id, item.nroIntimacion, onGuardar, onToggleSeleccion, seleccionado]);
+
+  return (
+    <Marker
+      position={[item.lat, item.lng]}
+      icon={crearIcono(colorPin, vencido, seleccionado)}
+      draggable={modoEdicion && isUserAdmin}
+      ref={markerRef}
+      eventHandlers={handlers}
+    >
+      <Popup>
+        <PopupContent item={item} vencido={vencido} guardando={guardando} guardadoOk={guardadoOk} modoEdicion={modoEdicion} seleccionado={seleccionado} />
+      </Popup>
+    </Marker>
+  );
+});
 
 export default function IntimacionesMapa({ intimaciones, isAdmin }: Props) {
   const isUserAdmin = isAdmin ?? false;
@@ -239,6 +264,10 @@ export default function IntimacionesMapa({ intimaciones, isAdmin }: Props) {
     setPinSeleccionado(null);
   }, [pinSeleccionado, guardarCoordenadas, isUserAdmin]);
 
+  const handleToggleSeleccion = useCallback((id: string, estaSeleccionado: boolean) => {
+    setPinSeleccionado(estaSeleccionado ? null : id);
+  }, []);
+
   // Estadísticas calculadas
   const stats = useMemo(() => {
     const vencidos = puntos.filter((p) => estaVencido(p.fechaVencimiento)).length;
@@ -385,24 +414,22 @@ export default function IntimacionesMapa({ intimaciones, isAdmin }: Props) {
                 const seleccionado = pinSeleccionado === id;
                 const vencido = estaVencido(item.fechaVencimiento);
                 const colorPin = seleccionado ? "verde" : item.aproximado ? "naranja" : "azul";
+                
                 return (
-                  <Marker
+                  <PuntoMarker
                     key={id}
-                    position={[item.lat, item.lng]}
-                    icon={crearIcono(colorPin, vencido, seleccionado)}
-                    draggable={modoEdicion && isUserAdmin}
-                    ref={(ref) => { if (ref && item.id) markerRefs.current[item.id] = ref; }}
-                    eventHandlers={{
-                      click: () => { if (modoEdicion) setPinSeleccionado(seleccionado ? null : id); },
-                      dragend: async (e) => {
-                        if (!modoEdicion || !isUserAdmin || !item.id) return;
-                        const { lat, lng } = (e.target as L.Marker).getLatLng();
-                        await guardarCoordenadas(item.id, lat, lng);
-                      },
-                    }}
-                  >
-                    <Popup><PopupContent item={item} vencido={vencido} guardando={guardando} guardadoOk={guardadoOk} modoEdicion={modoEdicion} seleccionado={seleccionado} /></Popup>
-                  </Marker>
+                    item={item}
+                    colorPin={colorPin}
+                    vencido={vencido}
+                    seleccionado={seleccionado}
+                    modoEdicion={modoEdicion}
+                    isUserAdmin={isUserAdmin}
+                    onGuardar={guardarCoordenadas}
+                    onToggleSeleccion={handleToggleSeleccion}
+                    guardando={guardando}
+                    guardadoOk={guardadoOk}
+                    markerRef={(ref: any) => { if (ref && item.id) markerRefs.current[item.id] = ref; }}
+                  />
                 );
               })
             }
