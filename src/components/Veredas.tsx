@@ -7,7 +7,8 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
-import { lazy, Suspense, ReactNode } from "react";
+import type { ReactNode } from "react";
+import { lazy, Suspense } from "react";
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
