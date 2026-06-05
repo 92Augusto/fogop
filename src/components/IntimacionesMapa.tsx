@@ -25,7 +25,12 @@ interface Props {
   isAdmin?: boolean;
 }
 
+const iconCache: Record<string, L.DivIcon> = {};
+
 function crearIcono(color: "azul" | "naranja" | "verde", vencido: boolean, editando: boolean): L.DivIcon {
+  const cacheKey = `${color}-${vencido}-${editando}`;
+  if (iconCache[cacheKey]) return iconCache[cacheKey];
+
   const pinColor = color === "azul" ? "#2563eb" : color === "naranja" ? "#ea7b1a" : "#16a34a";
   const centroColor = vencido ? "#ef4444" : "#ffffff";
   const borde = editando ? "2px solid #facc15" : "none";
@@ -36,7 +41,10 @@ function crearIcono(color: "azul" | "naranja" | "verde", vencido: boolean, edita
         <circle cx="12" cy="12" r="5" fill="${centroColor}"/>
       </svg>
     </div>`;
-  return L.divIcon({ html, className: "", iconSize: [24, 36], iconAnchor: [12, 36], popupAnchor: [0, -36] });
+  
+  const icon = L.divIcon({ html, className: "", iconSize: [24, 36], iconAnchor: [12, 36], popupAnchor: [0, -36] });
+  iconCache[cacheKey] = icon;
+  return icon;
 }
 
 function estaVencido(fechaVencimiento: string): boolean {
@@ -103,8 +111,6 @@ export default function IntimacionesMapa({ intimaciones, isAdmin }: Props) {
   const safeIntimaciones = Array.isArray(intimaciones) ? intimaciones : [];
 
   useEffect(() => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    delete (L.Icon.Default.prototype as any)._getIconUrl;
     setMounted(true);
   }, []);
 
