@@ -32,6 +32,7 @@ export interface StoredUser {
   role: UserRole;
   email?: string;
   password?: string;
+  paused?: boolean;
 }
 
 interface AccessLogEntry {
@@ -82,6 +83,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const userDoc = await getDoc(doc(db, "usuarios", firebaseUser.uid));
           if (userDoc.exists()) {
             const data = userDoc.data();
+            if (data.paused) {
+              await signOut(auth);
+              setUser(null);
+              sessionStorage.removeItem("fogop_session");
+              setLoading(false);
+              return;
+            }
             const appUser: AppUser = { username: data.username, role: data.role };
             setUser(appUser);
             sessionStorage.setItem("fogop_session", JSON.stringify(appUser));
@@ -149,8 +157,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const userDoc = await getDoc(doc(db, "usuarios", authUID));
       if (userDoc.exists()) {
-        // ✅ Caso ideal: Firebase Auth + Firestore doc vinculados correctamente
         const data = userDoc.data();
+        if (data.paused) {
+          await signOut(auth);
+          throw new Error("USER_PAUSED");
+        }
+        // ✅ Caso ideal: Firebase Auth + Firestore doc vinculados correctamente
         const appUser: AppUser = { username: data.username, role: data.role };
         setUser(appUser);
         sessionStorage.setItem("fogop_session", JSON.stringify(appUser));
@@ -187,6 +199,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       const oldData = docAntiguo.data();
+      if (oldData.paused) {
+        if (authUID) await signOut(auth);
+        throw new Error("USER_PAUSED");
+      }
 
       // ── PASO 3: Conseguir el UID de Firebase Auth ──────────────────────────
       // Activamos el flag ANTES de cualquier operación de Auth para que
@@ -241,6 +257,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         role: oldData.role,
         email: email,
         password: oldData.password ?? password, // conservar para visibilidad del admin
+        paused: oldData.paused ?? false,
       });
 
       // ── PASO 5: Eliminar el doc legacy con ID aleatorio ─────────────────────

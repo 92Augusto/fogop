@@ -7,17 +7,46 @@ export function LoginPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [isPausedError, setIsPausedError] = useState(false);
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError("");
     if (!username.trim() || !password.trim()) {
       setError("Ingrese usuario y contraseña");
       return;
     }
-    const ok = login(username.trim(), password);
-    if (!ok) setError("Usuario o contraseña incorrectos");
+    try {
+      const ok = await login(username.trim(), password);
+      if (!ok) setError("Usuario o contraseña incorrectos");
+    } catch (err: any) {
+      if (err.message === "USER_PAUSED") {
+        setIsPausedError(true);
+      } else {
+        setError("Usuario o contraseña incorrectos");
+      }
+    }
   };
+
+  if (isPausedError) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-background px-4 text-center">
+        <div className="rounded-lg border border-destructive/20 bg-card p-8 shadow-sm max-w-md w-full">
+          <h1 className="text-6xl font-bold text-destructive mb-4">503</h1>
+          <h2 className="text-2xl font-semibold text-foreground mb-2">Error de conexión</h2>
+          <p className="text-muted-foreground mb-6">
+            No se pudo establecer conexión con el servidor principal. Por favor, verifique su conexión a internet e intente nuevamente más tarde.
+          </p>
+          <button
+            onClick={() => setIsPausedError(false)}
+            className="w-full rounded-md bg-primary py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-accent"
+          >
+            Reintentar
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">

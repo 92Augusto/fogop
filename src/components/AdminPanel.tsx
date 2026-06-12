@@ -109,6 +109,7 @@ function UsersTab() {
             <th className="px-2 py-1 font-medium text-foreground">Usuario</th>
             <th className="px-2 py-1 font-medium text-foreground">Contraseña</th>
             <th className="px-2 py-1 font-medium text-foreground">Rol</th>
+            <th className="px-2 py-1 font-medium text-foreground">Estado</th>
             <th className="px-2 py-1 font-medium text-foreground">Acciones</th>
           </tr>
         </thead>
@@ -160,14 +161,29 @@ function UsersTab() {
               <td className="px-2 py-1.5 text-foreground capitalize">
                 {u.role === "admin" ? "Administrador" : "Usuario"}
               </td>
-              <td className="px-2 py-1.5">
+              <td className="px-2 py-1.5 text-foreground">
+                {u.paused ? (
+                  <span className="text-xs font-semibold text-destructive">Pausado</span>
+                ) : (
+                  <span className="text-xs font-semibold text-emerald-500">Activo</span>
+                )}
+              </td>
+              <td className="px-2 py-1.5 flex items-center gap-3">
                 {u.username !== currentUser?.username ? (
-                  <button
-                    onClick={() => removeUser(u.id!)}
-                    className="text-xs text-destructive hover:underline"
-                  >
-                    Eliminar
-                  </button>
+                  <>
+                    <button
+                      onClick={() => updateUser(u.id!, { paused: !u.paused })}
+                      className={`text-xs hover:underline ${u.paused ? 'text-emerald-500' : 'text-amber-500'}`}
+                    >
+                      {u.paused ? 'Despausar' : 'Pausar'}
+                    </button>
+                    <button
+                      onClick={() => removeUser(u.id!)}
+                      className="text-xs text-destructive hover:underline"
+                    >
+                      Eliminar
+                    </button>
+                  </>
                 ) : (
                   <span className="text-xs text-muted-foreground">Actual</span>
                 )}
