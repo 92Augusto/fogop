@@ -49,6 +49,15 @@ export const Route = createRootRoute({
   shellComponent: RootShell,
   component: RootComponent,
   notFoundComponent: NotFoundComponent,
+  errorComponent: ({ error }) => {
+    return (
+      <div style={{ padding: "20px", color: "red", backgroundColor: "white" }}>
+        <h1>Global Error</h1>
+        <pre>{error.message}</pre>
+        <pre>{error.stack}</pre>
+      </div>
+    );
+  },
 });
 
 function RootShell({ children }: { children: React.ReactNode }) {
