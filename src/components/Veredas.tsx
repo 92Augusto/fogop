@@ -9,6 +9,8 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
 import type { ReactNode } from "react";
 import { lazy, Suspense } from "react";
+import { exportVeredasPedidosToPdf, exportVeredasIntimacionesToPdf } from "@/lib/pdf-export";
+import { PasswordPromptDialog } from "@/components/PasswordPromptDialog";
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -39,7 +41,7 @@ const ESTADO_COLORS: Record<string, string> = {
   "Concluido":   "bg-green-100 text-green-800",
 };
 
-interface VeredaObra {
+export interface VeredaObra {
   id?: string;
   estado: EstadoObra;
   numeroBoleta: string;
@@ -57,7 +59,7 @@ interface VeredaObra {
   creadoEn: Timestamp | null;
 }
 
-interface Intimacion {
+export interface Intimacion {
   id?: string;
   fechaIntimacion: string;
   nroIntimacion: string;
@@ -195,61 +197,7 @@ function formatFecha(ts: Timestamp | null): string {
   return ts.toDate().toLocaleString("es-AR");
 }
 
-function exportarHtml(filas: Record<string, string>[], nombre: string) {
-  const encabezados = Object.keys(filas[0]);
-  const filasTR = filas
-    .map((f) => `<tr>${Object.values(f).map((v) => `<td>${v}</td>`).join("")}</tr>`)
-    .join("");
-  const html = `<table><tr>${encabezados.map((h) => `<th>${h}</th>`).join("")}</tr>${filasTR}</table>`;
-  const blob = new Blob(["\uFEFF" + html], { type: "application/vnd.ms-excel;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = nombre;
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
-function exportarExcelPedidos(
-  obras: VeredaObra[],
-  isAdmin: boolean,
-  colsVisibles: Record<string, boolean>
-) {
-  if (obras.length === 0) return;
-  const filas = obras.map((o) => {
-    const base: Record<string, string> = {};
-    if (colsVisibles.estado)        base["Estado"] = o.estado || "—";
-    if (colsVisibles.nroIntimacion) base["Nro. Intimación"] = o.numeroBoleta;
-    if (colsVisibles.nombreApellido) base["Nombre y Apellido"] = o.nombreApellido;
-    if (colsVisibles.direccion)     base["Dirección"] = o.direccion;
-    if (colsVisibles.barrio)        base["Barrio"] = o.barrio;
-    if (colsVisibles.telefono)      base["Teléfono"] = (o as any).telefono || "";
-    if (colsVisibles.observaciones) base["Observaciones"] = o.observaciones || "";
-    if (colsVisibles.fecha)         base["Fecha y Hora"] = formatFecha(o.creadoEn);
-    if (isAdmin)                    base["Cargado por"] = o.cargadoPor;
-    if (colsVisibles.expMadre)      base["Exp. Madre"] = o.expMadre || "";
-    if (colsVisibles.expHijo)       base["Exp. Hijo"] = o.expHijo || "";
-    return base;
-  });
-  exportarHtml(filas, "pedidos_veredas.xls");
-}
-
-function exportarExcelIntimaciones(filas: Intimacion[]) {
-  if (filas.length === 0) return;
-  const mapped = filas.map((i) => ({
-    "Fecha Intimación": i.fechaIntimacion,
-    "Nro. Intimación": i.nroIntimacion,
-    Responsable: i.responsable,
-    Domicilio: i.domicilio,
-    Inspector: i.inspector,
-    Zona: i.zona,
-    Motivo: i.motivo,
-    "Plazo (días)": i.plazo,
-    "Fecha Vencimiento": i.fechaVencimiento,
-    Observaciones: i.observaciones,
-  }));
-  exportarHtml(mapped, "intimaciones_veredas.xls");
-}
+// Removido exportarHtml, exportarExcelPedidos y exportarExcelIntimaciones
 
 // ─── Componente principal ─────────────────────────────────────────────────────
 
@@ -317,6 +265,7 @@ function PedidosTab({ nrosIntimacion }: { nrosIntimacion: Set<string> }) {
   const canExp = puedeEditarExp(user?.username, user?.role);
 
   const [obras, setObras] = useState<VeredaObra[]>([]);
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [showForm, setShowForm] = useState(false);
@@ -463,13 +412,22 @@ function PedidosTab({ nrosIntimacion }: { nrosIntimacion: Set<string> }) {
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-base font-bold text-foreground">Pedidos de obras de veredas</h2>
         <div className="flex gap-2">
-          <button
-            onClick={() => exportarExcelPedidos(obrasFiltradas, isAdmin, colsVisibles)}
-            disabled={obrasFiltradas.length === 0}
-            className="rounded-md border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted disabled:opacity-40"
-          >
-            Exportar Excel
-          </button>
+          {isAdmin && (
+            <>
+              <button
+                onClick={() => setIsPasswordModalOpen(true)}
+                disabled={obrasFiltradas.length === 0}
+                className="rounded-md border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted disabled:opacity-40"
+              >
+                Exportar PDF
+              </button>
+              <PasswordPromptDialog
+                isOpen={isPasswordModalOpen}
+                onClose={() => setIsPasswordModalOpen(false)}
+                onConfirm={() => exportVeredasPedidosToPdf(obrasFiltradas, isAdmin, colsVisibles)}
+              />
+            </>
+          )}
           <button
             onClick={() => setShowForm((v) => !v)}
             className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-accent"
@@ -975,6 +933,7 @@ function IntimacionesTab({ onIntimacionesCargadas }: { onIntimacionesCargadas: (
 
   const [intiTab, setIntiTab] = useState<IntiTab>("tabla");
   const [intimaciones, setIntimaciones] = useState<Intimacion[]>([]);
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [uploadMsg, setUploadMsg] = useState("");
@@ -1186,13 +1145,22 @@ const [paginaInti, setPaginaInti] = useState(1);
                   />
                 </>
               )}
-              <button
-                onClick={() => exportarExcelIntimaciones(resultados)}
-                disabled={resultados.length === 0}
-                className="rounded-md border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted disabled:opacity-40"
-              >
-                Exportar Excel
-              </button>
+              {isAdmin && (
+                <>
+                  <button
+                    onClick={() => setIsPasswordModalOpen(true)}
+                    disabled={resultados.length === 0}
+                    className="rounded-md border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted disabled:opacity-40"
+                  >
+                    Exportar PDF
+                  </button>
+                  <PasswordPromptDialog
+                    isOpen={isPasswordModalOpen}
+                    onClose={() => setIsPasswordModalOpen(false)}
+                    onConfirm={() => exportVeredasIntimacionesToPdf(resultados)}
+                  />
+                </>
+              )}
             </div>
           </div>
 
