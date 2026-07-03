@@ -61,10 +61,24 @@ export const Route = createRootRoute({
 });
 
 function RootShell({ children }: { children: React.ReactNode }) {
+  const firebaseConfigScript = typeof window === "undefined"
+    ? `window.__FIREBASE_CONFIG__ = {
+        apiKey: ${JSON.stringify(process.env.VITE_FIREBASE_API_KEY || "")},
+        authDomain: ${JSON.stringify(process.env.VITE_FIREBASE_AUTH_DOMAIN || "")},
+        projectId: ${JSON.stringify(process.env.VITE_FIREBASE_PROJECT_ID || "")},
+        storageBucket: ${JSON.stringify(process.env.VITE_FIREBASE_STORAGE_BUCKET || "")},
+        messagingSenderId: ${JSON.stringify(process.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "")},
+        appId: ${JSON.stringify(process.env.VITE_FIREBASE_APP_ID || "")}
+      };`
+    : "";
+
   return (
     <html lang="es">
       <head>
         <HeadContent />
+        {firebaseConfigScript && (
+          <script dangerouslySetInnerHTML={{ __html: firebaseConfigScript }} />
+        )}
       </head>
       <body>
         {children}

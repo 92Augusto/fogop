@@ -4,7 +4,16 @@ import { getAuth } from "firebase/auth";
 
 const getRuntimeEnv = (key: string): string => {
   if (typeof window !== "undefined") {
-    return (import.meta.env as any)[key] || "";
+    const mapping: Record<string, string> = {
+      VITE_FIREBASE_API_KEY: "apiKey",
+      VITE_FIREBASE_AUTH_DOMAIN: "authDomain",
+      VITE_FIREBASE_PROJECT_ID: "projectId",
+      VITE_FIREBASE_STORAGE_BUCKET: "storageBucket",
+      VITE_FIREBASE_MESSAGING_SENDER_ID: "messagingSenderId",
+      VITE_FIREBASE_APP_ID: "appId",
+    };
+    const mappedKey = mapping[key] || key;
+    return (window as any).__FIREBASE_CONFIG__?.[mappedKey] || (import.meta.env as any)[key] || "";
   }
   const globalEnv = (globalThis as any).process?.env || (globalThis as any).env || {};
   return globalEnv[key] || (import.meta.env as any)[key] || "";
