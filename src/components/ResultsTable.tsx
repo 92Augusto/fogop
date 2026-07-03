@@ -3,7 +3,6 @@ import type { Obra, EstadoObra } from "@/data/obras";
 import { exportObrasToPdf } from "@/lib/pdf-export";
 import { exportObrasToExcel } from "@/lib/excel-export";
 import { useAuth } from "@/lib/auth";
-import { PasswordPromptDialog } from "@/components/PasswordPromptDialog";
 
 const PAGE_SIZE = 20;
 
@@ -23,7 +22,6 @@ interface Props {
 export function ResultsTable({ results }: Props) {
   const { user } = useAuth();
   const [page, setPage] = useState(0);
-  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const totalPages = Math.max(1, Math.ceil(results.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages - 1);
   const slice = results.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE);
@@ -47,23 +45,12 @@ export function ResultsTable({ results }: Props) {
             </button>
           )}
           <button
-            onClick={() => {
-              if (user?.role === "admin") {
-                exportObrasToPdf(results);
-              } else {
-                setIsPasswordModalOpen(true);
-              }
-            }}
+            onClick={() => exportObrasToPdf(results)}
             disabled={results.length === 0}
             className="rounded-md bg-primary px-4 py-1.5 text-xs font-medium text-primary-foreground hover:bg-accent disabled:opacity-40"
           >
             Exportar PDF
           </button>
-          <PasswordPromptDialog
-            isOpen={isPasswordModalOpen}
-            onClose={() => setIsPasswordModalOpen(false)}
-            onConfirm={() => exportObrasToPdf(results)}
-          />
         </div>
       </div>
 

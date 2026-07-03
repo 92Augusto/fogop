@@ -10,7 +10,6 @@ import { useAuth } from "@/lib/auth";
 import type { ReactNode } from "react";
 import { lazy, Suspense } from "react";
 import { exportVeredasPedidosToPdf, exportVeredasIntimacionesToPdf } from "@/lib/pdf-export";
-import { PasswordPromptDialog } from "@/components/PasswordPromptDialog";
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -319,7 +318,6 @@ function PedidosTab({ nrosIntimacion }: { nrosIntimacion: Set<string> }) {
   const canExp = puedeEditarExp(user?.username, user?.role);
 
   const [obras, setObras] = useState<VeredaObra[]>([]);
-  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [showForm, setShowForm] = useState(false);
@@ -475,26 +473,13 @@ function PedidosTab({ nrosIntimacion }: { nrosIntimacion: Set<string> }) {
               Exportar Excel
             </button>
           )}
-          <>
-            <button
-              onClick={() => {
-                if (isAdmin) {
-                  exportVeredasPedidosToPdf(obrasFiltradas, isAdmin, colsVisibles);
-                } else {
-                  setIsPasswordModalOpen(true);
-                }
-              }}
-              disabled={obrasFiltradas.length === 0}
-              className="rounded-md border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted disabled:opacity-40"
-            >
-              Exportar PDF
-            </button>
-            <PasswordPromptDialog
-              isOpen={isPasswordModalOpen}
-              onClose={() => setIsPasswordModalOpen(false)}
-              onConfirm={() => exportVeredasPedidosToPdf(obrasFiltradas, isAdmin, colsVisibles)}
-            />
-          </>
+          <button
+            onClick={() => exportVeredasPedidosToPdf(obrasFiltradas, isAdmin, colsVisibles)}
+            disabled={obrasFiltradas.length === 0}
+            className="rounded-md border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted disabled:opacity-40"
+          >
+            Exportar PDF
+          </button>
           <button
             onClick={() => setShowForm((v) => !v)}
             className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-accent"
@@ -1000,7 +985,6 @@ function IntimacionesTab({ onIntimacionesCargadas }: { onIntimacionesCargadas: (
 
   const [intiTab, setIntiTab] = useState<IntiTab>("tabla");
   const [intimaciones, setIntimaciones] = useState<Intimacion[]>([]);
-  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [uploadMsg, setUploadMsg] = useState("");
@@ -1221,26 +1205,13 @@ const [paginaInti, setPaginaInti] = useState(1);
                   Exportar Excel
                 </button>
               )}
-              <>
-                <button
-                  onClick={() => {
-                    if (isAdmin) {
-                      exportVeredasIntimacionesToPdf(resultados);
-                    } else {
-                      setIsPasswordModalOpen(true);
-                    }
-                  }}
-                  disabled={resultados.length === 0}
-                  className="rounded-md border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted disabled:opacity-40"
-                >
-                  Exportar PDF
-                </button>
-                <PasswordPromptDialog
-                  isOpen={isPasswordModalOpen}
-                  onClose={() => setIsPasswordModalOpen(false)}
-                  onConfirm={() => exportVeredasIntimacionesToPdf(resultados)}
-                />
-              </>
+              <button
+                onClick={() => exportVeredasIntimacionesToPdf(resultados)}
+                disabled={resultados.length === 0}
+                className="rounded-md border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted disabled:opacity-40"
+              >
+                Exportar PDF
+              </button>
             </div>
           </div>
 

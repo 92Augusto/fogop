@@ -7,7 +7,6 @@ import {
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
 import { exportRelevamientosToPdf } from "@/lib/pdf-export";
-import { PasswordPromptDialog } from "@/components/PasswordPromptDialog";
 
 export interface Relevamiento {
   id?: string;
@@ -115,7 +114,6 @@ export function Relevamientos() {
   const isAdmin = user?.role === "admin";
 
   const [relevamientos, setRelevamientos] = useState<Relevamiento[]>([]);
-  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [showForm, setShowForm] = useState(false);
@@ -353,26 +351,13 @@ export function Relevamientos() {
               Exportar Excel
             </button>
           )}
-          <>
-            <button
-              onClick={() => {
-                if (isAdmin) {
-                  exportRelevamientosToPdf(resultados, isAdmin);
-                } else {
-                  setIsPasswordModalOpen(true);
-                }
-              }}
-              disabled={resultados.length === 0}
-              className="flex-1 sm:flex-initial rounded-lg border bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 transition-all"
-            >
-              Exportar PDF
-            </button>
-            <PasswordPromptDialog
-              isOpen={isPasswordModalOpen}
-              onClose={() => setIsPasswordModalOpen(false)}
-              onConfirm={() => exportRelevamientosToPdf(resultados, isAdmin)}
-            />
-          </>
+          <button
+            onClick={() => exportRelevamientosToPdf(resultados, isAdmin)}
+            disabled={resultados.length === 0}
+            className="flex-1 sm:flex-initial rounded-lg border bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 transition-all"
+          >
+            Exportar PDF
+          </button>
           <button
             onClick={() => setShowForm((v) => !v)}
             className="w-full sm:w-auto rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700 shadow-sm transition-colors"
