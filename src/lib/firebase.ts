@@ -2,13 +2,21 @@ import { initializeApp } from "firebase/app";
 import { getFirestore, enableIndexedDbPersistence } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 
+const getRuntimeEnv = (key: string): string => {
+  if (typeof window !== "undefined") {
+    return (import.meta.env as any)[key] || "";
+  }
+  const globalEnv = (globalThis as any).process?.env || (globalThis as any).env || {};
+  return globalEnv[key] || (import.meta.env as any)[key] || "";
+};
+
 export const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  apiKey: getRuntimeEnv("VITE_FIREBASE_API_KEY"),
+  authDomain: getRuntimeEnv("VITE_FIREBASE_AUTH_DOMAIN"),
+  projectId: getRuntimeEnv("VITE_FIREBASE_PROJECT_ID"),
+  storageBucket: getRuntimeEnv("VITE_FIREBASE_STORAGE_BUCKET"),
+  messagingSenderId: getRuntimeEnv("VITE_FIREBASE_MESSAGING_SENDER_ID"),
+  appId: getRuntimeEnv("VITE_FIREBASE_APP_ID"),
 };
 
 const app = initializeApp(firebaseConfig);
