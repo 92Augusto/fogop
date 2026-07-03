@@ -3,7 +3,8 @@ import { useAuth, type StoredUser, type UserRole } from "@/lib/auth";
 import { obrasData } from "@/data/obras-data";
 import type { Obra, TipoObra, EstadoObra } from "@/data/obras";
 import { TIPOS_OBRA, ESTADOS_OBRA, ANIOS } from "@/data/obras";
-import { exportAccessLogToExcel } from "@/lib/excel-export";
+import { exportAccessLogToPdf } from "@/lib/pdf-export";
+import { PasswordPromptDialog } from "@/components/PasswordPromptDialog";
 
 type Tab = "usuarios" | "obras" | "accesos";
 
@@ -250,6 +251,7 @@ function ObrasTab() {
 
 function AccessLogTab() {
   const { accessLog } = useAuth();
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
 
   return (
     <div>
@@ -258,12 +260,17 @@ function AccessLogTab() {
           Registro de accesos ({accessLog.length})
         </h3>
         <button
-          onClick={() => exportAccessLogToExcel(accessLog)}
+          onClick={() => setIsPasswordModalOpen(true)}
           disabled={accessLog.length === 0}
           className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-accent disabled:opacity-40"
         >
-          Exportar Excel
+          Exportar PDF
         </button>
+        <PasswordPromptDialog
+          isOpen={isPasswordModalOpen}
+          onClose={() => setIsPasswordModalOpen(false)}
+          onConfirm={() => exportAccessLogToPdf(accessLog)}
+        />
       </div>
       {accessLog.length === 0 ? (
         <p className="text-sm text-muted-foreground">Sin registros de acceso aún.</p>
