@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { Obra, EstadoObra } from "@/data/obras";
 import { exportObrasToPdf } from "@/lib/pdf-export";
+import { exportObrasToExcel } from "@/lib/excel-export";
 import { useAuth } from "@/lib/auth";
 import { PasswordPromptDialog } from "@/components/PasswordPromptDialog";
 
@@ -35,9 +36,24 @@ export function ResultsTable({ results }: Props) {
         <span className="text-sm text-muted-foreground">
           {results.length} resultado{results.length !== 1 ? "s" : ""} encontrado{results.length !== 1 ? "s" : ""}
         </span>
-        <>
+        <div className="flex gap-2">
+          {user?.role === "admin" && (
+            <button
+              onClick={() => exportObrasToExcel(results)}
+              disabled={results.length === 0}
+              className="rounded-md border px-4 py-1.5 text-xs font-medium text-foreground hover:bg-muted disabled:opacity-40"
+            >
+              Exportar Excel
+            </button>
+          )}
           <button
-            onClick={() => setIsPasswordModalOpen(true)}
+            onClick={() => {
+              if (user?.role === "admin") {
+                exportObrasToPdf(results);
+              } else {
+                setIsPasswordModalOpen(true);
+              }
+            }}
             disabled={results.length === 0}
             className="rounded-md bg-primary px-4 py-1.5 text-xs font-medium text-primary-foreground hover:bg-accent disabled:opacity-40"
           >
@@ -48,7 +64,7 @@ export function ResultsTable({ results }: Props) {
             onClose={() => setIsPasswordModalOpen(false)}
             onConfirm={() => exportObrasToPdf(results)}
           />
-        </>
+        </div>
       </div>
 
       {results.length === 0 ? (

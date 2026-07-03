@@ -79,6 +79,34 @@ function parsearExcelRelevamientos(
     .filter(Boolean) as Omit<Relevamiento, "id" | "cargadoPor" | "creadoEn">[];
 }
 
+// ─── Exportar Excel ───────────────────────────────────────────────────────────
+function exportarRelevamientos(filas: Relevamiento[], isAdmin: boolean) {
+  if (filas.length === 0) return;
+  const mapped = filas.map((r) => {
+    const base: Record<string, string> = {
+      Fecha: formatFecha(r.creadoEn),
+      Calle: r.calle,
+      Altura: r.altura || "",
+      Obra: r.obra,
+      Observaciones: r.observaciones || "",
+    };
+    if (isAdmin) base["Cargado por"] = r.cargadoPor;
+    return base;
+  });
+  const encabezados = Object.keys(mapped[0]);
+  const filasTR = mapped
+    .map((f) => `<tr>${Object.values(f).map((v) => `<td>${v}</td>`).join("")}</tr>`)
+    .join("");
+  const html = `<table><tr>${encabezados.map((h) => `<th>${h}</th>`).join("")}</tr>${filasTR}</table>`;
+  const blob = new Blob(["" + html], { type: "application/vnd.ms-excel;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "relevamientos.xls";
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 
 
 // ─── Componente ───────────────────────────────────────────────────────────────
@@ -316,9 +344,24 @@ export function Relevamientos() {
               />
             </>
           )}
+          {isAdmin && (
+            <button
+              onClick={() => exportarRelevamientos(resultados, isAdmin)}
+              disabled={resultados.length === 0}
+              className="flex-1 sm:flex-initial rounded-lg border bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 transition-all"
+            >
+              Exportar Excel
+            </button>
+          )}
           <>
             <button
-              onClick={() => setIsPasswordModalOpen(true)}
+              onClick={() => {
+                if (isAdmin) {
+                  exportRelevamientosToPdf(resultados, isAdmin);
+                } else {
+                  setIsPasswordModalOpen(true);
+                }
+              }}
               disabled={resultados.length === 0}
               className="flex-1 sm:flex-initial rounded-lg border bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 transition-all"
             >

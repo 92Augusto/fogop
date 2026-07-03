@@ -197,7 +197,61 @@ function formatFecha(ts: Timestamp | null): string {
   return ts.toDate().toLocaleString("es-AR");
 }
 
-// Removido exportarHtml, exportarExcelPedidos y exportarExcelIntimaciones
+function exportarHtml(filas: Record<string, string>[], nombre: string) {
+  const encabezados = Object.keys(filas[0]);
+  const filasTR = filas
+    .map((f) => `<tr>${Object.values(f).map((v) => `<td>${v}</td>`).join("")}</tr>`)
+    .join("");
+  const html = `<table><tr>${encabezados.map((h) => `<th>${h}</th>`).join("")}</tr>${filasTR}</table>`;
+  const blob = new Blob(["\uFEFF" + html], { type: "application/vnd.ms-excel;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = nombre;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function exportarExcelPedidos(
+  obras: VeredaObra[],
+  isAdmin: boolean,
+  colsVisibles: Record<string, boolean>
+) {
+  if (obras.length === 0) return;
+  const filas = obras.map((o) => {
+    const base: Record<string, string> = {};
+    if (colsVisibles.estado)        base["Estado"] = o.estado || "—";
+    if (colsVisibles.nroIntimacion) base["Nro. Intimación"] = o.numeroBoleta;
+    if (colsVisibles.nombreApellido) base["Nombre y Apellido"] = o.nombreApellido;
+    if (colsVisibles.direccion)     base["Dirección"] = o.direccion;
+    if (colsVisibles.barrio)        base["Barrio"] = o.barrio;
+    if (colsVisibles.telefono)      base["Teléfono"] = (o as any).telefono || "";
+    if (colsVisibles.observaciones) base["Observaciones"] = o.observaciones || "";
+    if (colsVisibles.fecha)         base["Fecha y Hora"] = formatFecha(o.creadoEn);
+    if (isAdmin)                    base["Cargado por"] = o.cargadoPor;
+    if (colsVisibles.expMadre)      base["Exp. Madre"] = o.expMadre || "";
+    if (colsVisibles.expHijo)       base["Exp. Hijo"] = o.expHijo || "";
+    return base;
+  });
+  exportarHtml(filas, "pedidos_veredas.xls");
+}
+
+function exportarExcelIntimaciones(filas: Intimacion[]) {
+  if (filas.length === 0) return;
+  const mapped = filas.map((i) => ({
+    "Fecha Intimación": i.fechaIntimacion,
+    "Nro. Intimación": i.nroIntimacion,
+    Responsable: i.responsable,
+    Domicilio: i.domicilio,
+    Inspector: i.inspector,
+    Zona: i.zona,
+    Motivo: i.motivo,
+    "Plazo (días)": i.plazo,
+    "Fecha Vencimiento": i.fechaVencimiento,
+    Observaciones: i.observaciones,
+  }));
+  exportarHtml(mapped, "intimaciones_veredas.xls");
+}
 
 // ─── Componente principal ─────────────────────────────────────────────────────
 
@@ -412,9 +466,24 @@ function PedidosTab({ nrosIntimacion }: { nrosIntimacion: Set<string> }) {
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-base font-bold text-foreground">Pedidos de obras de veredas</h2>
         <div className="flex gap-2">
+          {isAdmin && (
+            <button
+              onClick={() => exportarExcelPedidos(obrasFiltradas, isAdmin, colsVisibles)}
+              disabled={obrasFiltradas.length === 0}
+              className="rounded-md border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted disabled:opacity-40"
+            >
+              Exportar Excel
+            </button>
+          )}
           <>
             <button
-              onClick={() => setIsPasswordModalOpen(true)}
+              onClick={() => {
+                if (isAdmin) {
+                  exportVeredasPedidosToPdf(obrasFiltradas, isAdmin, colsVisibles);
+                } else {
+                  setIsPasswordModalOpen(true);
+                }
+              }}
               disabled={obrasFiltradas.length === 0}
               className="rounded-md border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted disabled:opacity-40"
             >
@@ -1143,9 +1212,24 @@ const [paginaInti, setPaginaInti] = useState(1);
                   />
                 </>
               )}
+              {isAdmin && (
+                <button
+                  onClick={() => exportarExcelIntimaciones(resultados)}
+                  disabled={resultados.length === 0}
+                  className="rounded-md border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted disabled:opacity-40"
+                >
+                  Exportar Excel
+                </button>
+              )}
               <>
                 <button
-                  onClick={() => setIsPasswordModalOpen(true)}
+                  onClick={() => {
+                    if (isAdmin) {
+                      exportVeredasIntimacionesToPdf(resultados);
+                    } else {
+                      setIsPasswordModalOpen(true);
+                    }
+                  }}
                   disabled={resultados.length === 0}
                   className="rounded-md border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted disabled:opacity-40"
                 >
