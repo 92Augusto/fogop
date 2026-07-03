@@ -35,22 +35,20 @@ export function ResultsTable({ results }: Props) {
         <span className="text-sm text-muted-foreground">
           {results.length} resultado{results.length !== 1 ? "s" : ""} encontrado{results.length !== 1 ? "s" : ""}
         </span>
-        {user?.role === "admin" && (
-          <>
-            <button
-              onClick={() => setIsPasswordModalOpen(true)}
-              disabled={results.length === 0}
-              className="rounded-md bg-primary px-4 py-1.5 text-xs font-medium text-primary-foreground hover:bg-accent disabled:opacity-40"
-            >
-              Exportar PDF
-            </button>
-            <PasswordPromptDialog
-              isOpen={isPasswordModalOpen}
-              onClose={() => setIsPasswordModalOpen(false)}
-              onConfirm={() => exportObrasToPdf(results)}
-            />
-          </>
-        )}
+        <>
+          <button
+            onClick={() => setIsPasswordModalOpen(true)}
+            disabled={results.length === 0}
+            className="rounded-md bg-primary px-4 py-1.5 text-xs font-medium text-primary-foreground hover:bg-accent disabled:opacity-40"
+          >
+            Exportar PDF
+          </button>
+          <PasswordPromptDialog
+            isOpen={isPasswordModalOpen}
+            onClose={() => setIsPasswordModalOpen(false)}
+            onConfirm={() => exportObrasToPdf(results)}
+          />
+        </>
       </div>
 
       {results.length === 0 ? (

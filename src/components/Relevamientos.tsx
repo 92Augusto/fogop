@@ -316,22 +316,20 @@ export function Relevamientos() {
               />
             </>
           )}
-          {isAdmin && (
-            <>
-              <button
-                onClick={() => setIsPasswordModalOpen(true)}
-                disabled={resultados.length === 0}
-                className="flex-1 sm:flex-initial rounded-lg border bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 transition-all"
-              >
-                Exportar PDF
-              </button>
-              <PasswordPromptDialog
-                isOpen={isPasswordModalOpen}
-                onClose={() => setIsPasswordModalOpen(false)}
-                onConfirm={() => exportRelevamientosToPdf(resultados, isAdmin)}
-              />
-            </>
-          )}
+          <>
+            <button
+              onClick={() => setIsPasswordModalOpen(true)}
+              disabled={resultados.length === 0}
+              className="flex-1 sm:flex-initial rounded-lg border bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 transition-all"
+            >
+              Exportar PDF
+            </button>
+            <PasswordPromptDialog
+              isOpen={isPasswordModalOpen}
+              onClose={() => setIsPasswordModalOpen(false)}
+              onConfirm={() => exportRelevamientosToPdf(resultados, isAdmin)}
+            />
+          </>
           <button
             onClick={() => setShowForm((v) => !v)}
             className="w-full sm:w-auto rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700 shadow-sm transition-colors"

@@ -412,22 +412,20 @@ function PedidosTab({ nrosIntimacion }: { nrosIntimacion: Set<string> }) {
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-base font-bold text-foreground">Pedidos de obras de veredas</h2>
         <div className="flex gap-2">
-          {isAdmin && (
-            <>
-              <button
-                onClick={() => setIsPasswordModalOpen(true)}
-                disabled={obrasFiltradas.length === 0}
-                className="rounded-md border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted disabled:opacity-40"
-              >
-                Exportar PDF
-              </button>
-              <PasswordPromptDialog
-                isOpen={isPasswordModalOpen}
-                onClose={() => setIsPasswordModalOpen(false)}
-                onConfirm={() => exportVeredasPedidosToPdf(obrasFiltradas, isAdmin, colsVisibles)}
-              />
-            </>
-          )}
+          <>
+            <button
+              onClick={() => setIsPasswordModalOpen(true)}
+              disabled={obrasFiltradas.length === 0}
+              className="rounded-md border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted disabled:opacity-40"
+            >
+              Exportar PDF
+            </button>
+            <PasswordPromptDialog
+              isOpen={isPasswordModalOpen}
+              onClose={() => setIsPasswordModalOpen(false)}
+              onConfirm={() => exportVeredasPedidosToPdf(obrasFiltradas, isAdmin, colsVisibles)}
+            />
+          </>
           <button
             onClick={() => setShowForm((v) => !v)}
             className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-accent"
@@ -1145,22 +1143,20 @@ const [paginaInti, setPaginaInti] = useState(1);
                   />
                 </>
               )}
-              {isAdmin && (
-                <>
-                  <button
-                    onClick={() => setIsPasswordModalOpen(true)}
-                    disabled={resultados.length === 0}
-                    className="rounded-md border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted disabled:opacity-40"
-                  >
-                    Exportar PDF
-                  </button>
-                  <PasswordPromptDialog
-                    isOpen={isPasswordModalOpen}
-                    onClose={() => setIsPasswordModalOpen(false)}
-                    onConfirm={() => exportVeredasIntimacionesToPdf(resultados)}
-                  />
-                </>
-              )}
+              <>
+                <button
+                  onClick={() => setIsPasswordModalOpen(true)}
+                  disabled={resultados.length === 0}
+                  className="rounded-md border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted disabled:opacity-40"
+                >
+                  Exportar PDF
+                </button>
+                <PasswordPromptDialog
+                  isOpen={isPasswordModalOpen}
+                  onClose={() => setIsPasswordModalOpen(false)}
+                  onConfirm={() => exportVeredasIntimacionesToPdf(resultados)}
+                />
+              </>
             </div>
           </div>
 
