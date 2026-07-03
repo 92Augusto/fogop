@@ -5,7 +5,14 @@ import type { Relevamiento } from "@/components/Relevamientos";
 import type { VeredaObra, Intimacion } from "@/components/Veredas";
 
 export function exportObrasToPdf(obras: Obra[], filename = "obras_fogop.pdf") {
-  const doc = new jsPDF("landscape");
+  const doc = new jsPDF({
+    orientation: "landscape",
+    encryption: {
+      userPassword: "",
+      ownerPassword: "Augustoelmascapo",
+      userPermissions: ["print"]
+    }
+  });
   
   // Título
   doc.setFontSize(16);
@@ -74,7 +81,14 @@ export function exportAccessLogToPdf(
   log: { username: string; role: string; loginAt: string }[],
   filename = "registro_accesos.pdf"
 ) {
-  const doc = new jsPDF();
+  const doc = new jsPDF({
+    orientation: "portrait",
+    encryption: {
+      userPassword: "",
+      ownerPassword: "Augustoelmascapo",
+      userPermissions: ["print"]
+    }
+  });
   
   doc.setFontSize(16);
   doc.text("Registro de Accesos - FOGOP", 14, 15);
@@ -145,7 +159,14 @@ function drawWatermark(doc: jsPDF) {
 
 export function exportRelevamientosToPdf(filas: Relevamiento[], isAdmin: boolean, filename = "relevamientos.pdf") {
   if (filas.length === 0) return;
-  const doc = new jsPDF();
+  const doc = new jsPDF({
+    orientation: "portrait",
+    encryption: {
+      userPassword: "",
+      ownerPassword: "Augustoelmascapo",
+      userPermissions: ["print"]
+    }
+  });
   
   doc.setFontSize(16);
   doc.text("Reporte de Relevamientos - FOGOP", 14, 15);
@@ -200,7 +221,14 @@ export function exportVeredasPedidosToPdf(
   filename = "pedidos_veredas.pdf"
 ) {
   if (obras.length === 0) return;
-  const doc = new jsPDF("landscape");
+  const doc = new jsPDF({
+    orientation: "landscape",
+    encryption: {
+      userPassword: "",
+      ownerPassword: "Augustoelmascapo",
+      userPermissions: ["print"]
+    }
+  });
   
   doc.setFontSize(16);
   doc.text("Pedidos de Obras de Veredas - FOGOP", 14, 15);
@@ -255,7 +283,14 @@ export function exportVeredasPedidosToPdf(
 
 export function exportVeredasIntimacionesToPdf(filas: Intimacion[], filename = "intimaciones_veredas.pdf") {
   if (filas.length === 0) return;
-  const doc = new jsPDF("landscape");
+  const doc = new jsPDF({
+    orientation: "landscape",
+    encryption: {
+      userPassword: "",
+      ownerPassword: "Augustoelmascapo",
+      userPermissions: ["print"]
+    }
+  });
   
   doc.setFontSize(16);
   doc.text("Intimaciones de Veredas - FOGOP", 14, 15);
